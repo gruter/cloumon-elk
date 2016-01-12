@@ -23,7 +23,7 @@ vi env.sh # ELASTICSEARCH_HOST_PORT='["localhost:5921"]' change the value approp
 ./install kibana -s $KIBANA_TARGET_SERVER -e $ES_TARGET_SERVER
 
 # install logstash - hadoop - ganglia
-./install logstash -s $LOGSTASH_TARGET_SERVER -c hadoop -p ganglia -g gruter
+./install logstash -s $LOGSTASH_TARGET_SERVER -c hadoop -p ganglia -g development
 
 # install logstash - hadoop - jmx
 cat > hadoop-deploy.config<<EOF
@@ -49,10 +49,10 @@ EOF
 ./install logstash -s $LOGSTASH_TARGET_SERVER -c hadoop-poller -p jmx -f ./namenodes.config -k -g development
 
 ## install logstash - tajo - ganglia
-./install logstash -s $LOGSTASH_TARGET_SERVER -c tajo -p ganglia -k -g gruter
+./install logstash -s $LOGSTASH_TARGET_SERVER -c tajo -p ganglia -k -g development
 
 ## install logstash - flume - ganglia
-./install logstash -s $LOGSTASH_TARGET_SERVER -c flume -p ganglia -k -g gruter
+./install logstash -s $LOGSTASH_TARGET_SERVER -c flume -p ganglia -k -g development
 
 ## install logstash - flume - jmx
 cat > flume-deploy.config<<EOF
@@ -92,7 +92,7 @@ EOF
 ./install logstash -s $LOGSTASH_TARGET_SERVER -c elasticsearch -p http -k -f ./elasticsearch-server.config -g development
 
 ## install logstash - system metric - http
-./install logstash -s $LOGSTASH_TARGET_SERVER -c system -p http -k -g gruter
+./install logstash -s $LOGSTASH_TARGET_SERVER -c system -p http -k -g development
 
 # install system metric collector agent
 cat > sysagent-deploy.config<<EOF
@@ -114,14 +114,14 @@ EOF
 
 # kibana data restore
 cd ./kibana-data
-./restore.sh $ES_TARGET_SERVER:5911 hadoop-ganglia.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 hadoop-jmx.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 tajo-ganglia.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 hbase-ganglia.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 hbase-jmx.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 flume-ganglia.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 flume-jmx.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 zookeeper-jmx.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 system-http.json gruter
-./restore.sh $ES_TARGET_SERVER:5911 elasticsearch-http.json gruter
+./restore.sh $ES_TARGET_SERVER:5911 hadoop-ganglia.json development
+./restore.sh $ES_TARGET_SERVER:5911 hadoop-jmx.json development
+./restore.sh $ES_TARGET_SERVER:5911 tajo-ganglia.json development
+./restore.sh $ES_TARGET_SERVER:5911 hbase-ganglia.json development
+./restore.sh $ES_TARGET_SERVER:5911 hbase-jmx.json development
+./restore.sh $ES_TARGET_SERVER:5911 flume-ganglia.json development
+./restore.sh $ES_TARGET_SERVER:5911 flume-jmx.json development
+./restore.sh $ES_TARGET_SERVER:5911 zookeeper-jmx.json development
+./restore.sh $ES_TARGET_SERVER:5911 system-http.json development
+./restore.sh $ES_TARGET_SERVER:5911 elasticsearch-http.json development
 

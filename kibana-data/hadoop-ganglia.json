@@ -8,7 +8,7 @@
       "description": "",
       "version": 1,
       "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"{cluster_name}-hadoop-ganglia-metrics-*\",\"query\":{\"query_string\":{\"query\":\"log_host:gruter002.gruter.com AND (name:jvm.JvmMetrics.MemNonHeapUsedM OR name: jvm.JvmMetrics.MemNonHeapMaxM)\",\"analyze_wildcard\":true}},\"filter\":[]}"
+        "searchSourceJSON": "{\"index\":\"{cluster_name}-hadoop-ganglia-metrics-*\",\"query\":{\"query_string\":{\"query\":\"log_host:host002 AND (name:jvm.JvmMetrics.MemNonHeapUsedM OR name: jvm.JvmMetrics.MemNonHeapMaxM)\",\"analyze_wildcard\":true}},\"filter\":[]}"
       }
     }
   },

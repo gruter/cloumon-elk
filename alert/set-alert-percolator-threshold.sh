@@ -88,7 +88,7 @@ curl -XPUT "http://$HOST_PORT/alert-percolator/.percolator/hadoop-namenode-heap-
             "must": [
                {
                    "query_string": {
-                       "query": "host:gruter002 AND (name:JvmMetrics.MemHeapUsedM)" 
+                       "query": "host:host002 AND (name:JvmMetrics.MemHeapUsedM)" 
                     }
                },
                {
