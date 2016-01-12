@@ -1,0 +1,14 @@
+{
+  "host": "{hostname}",
+  "port": 5953,
+  "username": "monitorRole",
+  "password": "hadooptest",
+  "queries": [
+  {
+    "object_name": "Hadoop:service=JournalNode,name=*"
+  },
+  {
+    "object_name": "Hadoop:service=JournalNode,name=MetricsSystem,sub=*"
+  }
+  ]
+}

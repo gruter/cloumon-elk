@@ -1,0 +1,17 @@
+{
+  "host": "{hostname}",
+  "port": 5991,
+  "username": "monitorRole",
+  "password": "flumetest",
+  "queries": [
+  {
+    "object_name": "org.apache.flume.channel:type=*"
+  },
+  {
+    "object_name": "org.apache.flume.sink:type=*"
+  },
+  {
+    "object_name": "org.apache.flume.source:type=*"
+  }
+  ]
+}

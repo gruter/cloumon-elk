@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+ES_REMOTE_HOME=$(cd `dirname "$0"`; pwd)
+
+REMOTE_USER=gmonitor
+CLOUMON_HOME=/home/$REMOTE_USER/cloumon
+ES_HOME=$CLOUMON_HOME/elk/elasticsearch
+ES_PORT=5911
+
+for arg; do
+  COMMAND=$arg
+  break
+done
+
+print_help() {
+  cat <<EOF
+Usage: $0 [COMMAND] [options]
+
+Commands:
+  config                  Open elasticsearch configuration
+  start                   Start elasticsearch
+  stop                    Stop elasticsearch
+
+Options:
+  -s                      hostname for elasticsearch is installed
+  -h                      Show this message
+EOF
+}
+
+require_option () {
+  if [[ ! $1 ]]; then
+    echo "$2 is required."
+  fi
+}
+
+COMMAND_LIST="config start stop"
+
+if [ -z $COMMAND ]; then
+  print_help
+  exit 1
+else 
+  matched=0
+  for cmd in $COMMAND_LIST; do
+    if [ $cmd = $COMMAND ]; then
+      matched=1
+      break
+    fi
+  done
+  if [ $matched -eq 0 ]; then
+    print_help
+    exit 1
+  fi
+fi
+
+shift 
+
+OPTS=`getopt s:h "$@"`
+RT=$?
+if [ $RT -ne 0 ] || [ $# -eq 0 ]; then
+  echo ""
+  print_help
+  exit 1
+fi
+
+QUOTED_OPTS=
+for o in $OPTS; do
+  QUOTED_OPTS="$QUOTED_OPTS \"$o\""
+done
+
+# quotes whitespace 
+eval set -- "$QUOTED_OPTS" # this isn't working properly in OSX. it can't quote whitespace string
+
+while true; do
+  #echo $1
+  case "$1" in
+    ("-s"|"--server")
+      SERVER_OPTION=$2
+      shift 2
+    ;;
+    ("-h"|"--help")
+      print_help
+      exit 0
+      shift
+    ;;
+    ("--") shift; break ;;
+    #(*) break;;
+  esac
+done
+
+if [[ ! $SERVER_OPTION ]]; then
+    require_option "$SERVER_OPTION" "server option"
+    echo ""
+    print_help
+fi
+
+if [ $COMMAND = "start" ]; then
+  echo "Starting Elasticsearch server at $SERVER_OPTION"
+  $ES_REMOTE_HOME/tools.sh run -u $REMOTE_USER -s $SERVER_OPTION "$ES_HOME/bin/start-es.sh"
+  echo "Waiting Elasticsearch server up"
+  sleep 10
+  echo "Setting Dynamic templates"
+  $ES_REMOTE_HOME/tools.sh run -u $REMOTE_USER -s $SERVER_OPTION "$ES_HOME/bin/set-dynamic-mapping.sh $SERVER_OPTION:$ES_PORT"
+  echo "Setting Kibana mappings"
+  $ES_REMOTE_HOME/tools.sh run -u $REMOTE_USER -s $SERVER_OPTION "$ES_HOME/bin/set-kibana-mappings.sh $SERVER_OPTION:$ES_PORT"
+elif [ $COMMAND = "stop" ]; then
+  $ES_REMOTE_HOME/tools.sh run -u $REMOTE_USER -s $SERVER_OPTION "$ES_HOME/bin/stop-es.sh"
+elif [ $COMMAND = "config" ]; then
+  ssh -t $REMOTE_USER@$SERVER_OPTION vi $ES_HOME/config/elasticsearch.yml
+else
+  print_help
+fi

@@ -1,0 +1,14 @@
+{
+  "host": "{hostname}",
+  "port": 5981,
+  "username": "monitorRole",
+  "password": "zookeepertest",
+  "queries": [
+  {
+    "object_name": "org.apache.ZooKeeperService:name0=ReplicatedServer_id*,name1=replica.*,name2=Follower,*"
+  },
+  {
+    "object_name": "org.apache.ZooKeeperService:name0=ReplicatedServer_id*,name1=replica.*,name2=Leader,*"
+  }
+  ]
+}

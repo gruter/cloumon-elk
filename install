@@ -1,0 +1,505 @@
+#!/usr/bin/env bash
+
+INSTALL_HOME=$(cd `dirname "$0"`; pwd)
+. $INSTALL_HOME/env.sh
+
+REMOTE_USER=gmonitor
+CLOUMON_HOME=/home/$REMOTE_USER/cloumon
+
+for arg; do
+  COMMAND=$arg
+  break
+done
+
+print_help() {
+  cat <<EOF
+Usage: $0 [COMMAND] [options]
+
+Commands:
+  elasticsearch           Install elasticsearch
+  logstash                Install logstash
+  kibana                  Install kibana
+  sysagent                Install system agent
+  alert                   Install alert agent
+EOF
+}
+
+
+COMMAND_LIST="elasticsearch logstash kibana sysagent alert"
+LOGSTASH_OPTION_LIST="hadoop-jmx hadoop-ganglia tajo-ganglia hbase-jmx hbase-ganglia flume-ganglia flume-jmx zookeeper-jmx system-http hadoop-poller-ganglia hadoop-poller-jmx elasticsearch-http tajo-jmx"
+
+if [ -z $COMMAND ]; then
+  print_help
+  exit 1
+else 
+  matched=0
+  for cmd in $COMMAND_LIST; do
+    if [ $cmd = $COMMAND ]; then
+      matched=1
+      break
+    fi
+  done
+  if [ $matched -eq 0 ]; then
+    print_help
+    exit 1
+  fi
+fi
+
+shift 
+
+print_alert_help() {
+  cat <<EOF
+Usage: $0 alert [options]
+
+This script helps to install alert
+
+Options:
+  -e TEXT                 Elasticsearch hostname for alert
+  -s TEXT                 Server name or file name that has hosts to install sysagent
+  -h, --help              Show this message.
+EOF
+}
+
+print_sysagent_help() {
+  cat <<EOF
+Usage: $0 sysagent [options]
+
+This script helps to install sysagent
+
+Options:
+  -s TEXT                 Server name or file name that has hosts to install sysagent
+  -h, --help              Show this message.
+EOF
+}
+
+print_elasticsearch_help() {
+  cat <<EOF
+Usage: $0 elasticsearch [options]
+
+This script helps to install elasticsearch
+
+Options:
+  -s TEXT                 Server name to install elasticsearch
+  -m TEXT                 Memory size which starts with elasticsearch
+  -h, --help              Show this message.
+EOF
+}
+
+print_kibana_help() {
+  cat <<EOF
+Usage: $0 kibana [options]
+
+This script helps to install kibana
+
+Options:
+  -e TEXT                 Elasticsearch hostname for kibana
+  -s TEXT                 Server name to install kibana
+  -h, --help              Show this message.
+EOF
+}
+
+print_logstash_help() {
+    cat <<EOF
+Usage: $0 logstash [options]
+
+This script helps to packag cloumon-logstash
+
+Options:
+  -g TEXT                 Cluster name
+  -c TEXT                 Component name. ex) {tajo,hadoop,zookeeper}
+  -p TEXT                 Protocol name. ex) {ganglia,jmx}
+  -s TEXT                 Server name to install logstash
+  -f TEXT                 File name that have host name and their type.  file ex) "hadoop-deploy.config"
+  -k                      Skip to copy binary files.
+  -h                      Show this message.
+
+Possible options:
+  -c hadoop -p jmx -f ./hadoop-deploy.config
+  -c hadoop -p ganglia 
+  -c hadoop-poller -p jmx -f ./namenodes.config
+  -c tajo -p ganglia
+  -c flume -p jmx -f ./flume-deploy.config
+  -c flume -p ganglia
+  -c hbase -p jmx -f ./hbase-deploy.config
+  -c hbase -p ganglia 
+  -c zookeeper -p jmx -f ./zookeeper-deploy.config
+  -c system -p http
+  -c elasticsearch -p http -f ./elasticsearch.config
+EOF
+}
+
+parse_args() {
+  help_page=$1
+  shift
+  # quoting
+  QUOTED_OPTS=
+  for o in $@; do
+    QUOTED_OPTS="$QUOTED_OPTS \"$o\""
+  done
+
+  # quotes whitespace 
+  eval set -- "$QUOTED_OPTS" # this isn't working properly in OSX. it can't quote whitespace string
+
+  while true; do
+    #echo $1
+    case "$1" in
+      ("-c"|"--component")
+        COMPONENT_OPTION=$2
+        shift 2
+      ;;
+      ("-p"|"--protocol")
+        PROTOCOL_OPTION=$2
+        shift 2
+      ;;
+      ("-s"|"--server")
+        SERVER_OPTION=$2
+        shift 2
+      ;;
+      ("-f"|"--file")
+        FILENAME_OPTION=$2
+        shift 2
+      ;;
+      ("-e"|"--file")
+        ES_SERVER_OPTION=$2
+        shift 2
+      ;;
+      ("-m"|"--memory")
+        MEMORY_OPTION=$2
+        shift 2
+      ;;
+      ("-k"|"--skip")
+        SKIP_BINARY=1
+        shift 1
+      ;;
+      ("-g"|"--group")
+        CLUSTER_OPTION=$2
+        shift 2
+      ;;
+      ("-h"|"--help")
+        eval $help_page
+        exit 0
+        shift
+      ;;
+      ("--") shift; break ;;
+      #(*) break;;
+    esac
+  done
+}
+
+require_option () {
+  if [[ ! $1 ]]; then
+    echo "$2 is required."
+  fi
+}
+
+mkdir_for_cloumon_elk() {
+  echo "Trying to create directory to deploy elasticsearch: $CLOUMON_HOME/elk, $CLOUMON_HOME/metrics/system"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "mkdir -p $CLOUMON_HOME/elk 2> /dev/null; mkdir -p $CLOUMON_HOME/metrics/system 2> /dev/null"
+}
+# create directory
+
+
+PLATFORM=`uname -s`
+
+if [ "$PLATFORM" = "Darwin" ]; then
+  SED_REPLACE_CMD="sed -i .bak"
+elif [ "$PLATFORM" = "Linux" ]; then
+  SED_REPLACE_CMD="sed -i "
+fi
+
+if [ $COMMAND = "logstash" ]; then
+
+  OPTS=`getopt c:p:hks:f:g: "$@"`
+  RT=$?
+  if [ $RT -ne 0 ] || [ $# -eq 0 ]; then
+    echo ""
+    print_logstash_help
+    exit 1
+  fi
+
+  parse_args "print_logstash_help" $OPTS
+
+  if [[ ! $COMPONENT_OPTION ]] || [[ ! $PROTOCOL_OPTION ]] || [[ ! $SERVER_OPTION ]]; then
+    require_option "$COMPONENT_OPTION" "component option"
+    require_option "$PROTOCOL_OPTION" "protocol option"
+    require_option "$SERVER_OPTION" "server option"
+    echo ""
+    print_logstash_help
+    exit 1
+  fi
+
+  if [[ $PROTOCOL_OPTION == "jmx" ]] || [[ $COMPONENT_OPTION == "hadoop-poller" ]] && [[ ! $FILENAME_OPTION ]]; then
+    if [[ $PROTOCOL_OPTION == "jmx" ]]; then
+      require_option "$FILENAME_OPTION" "filename option for jmx protocol"
+    else 
+      require_option "$FILENAME_OPTION" "filename option"
+    fi
+    echo ""
+    print_logstash_help
+    exit 1
+  fi
+
+  matched=0
+  for logstash_option in $LOGSTASH_OPTION_LIST; do
+    if [[ "$COMPONENT_OPTION-$PROTOCOL_OPTION" == $logstash_option ]]; then
+      matched=1
+      break
+    fi
+  done
+  if [ $matched -eq 0 ]; then
+    echo "Not supported such that combination: $COMPONENT_OPTION-$PROTOCOL_OPTION"
+    echo ""
+    print_logstash_help
+    exit 1
+  fi
+
+
+  mkdir_for_cloumon_elk
+  LOGSTASH_HOME=$CLOUMON_HOME/elk/logstash
+  # deploy logstash 
+  if [[ ! $SKIP_BINARY ]]; then 
+    echo "Copying logstash binary file to $SERVER_OPTION"
+    $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $INSTALL_HOME/$LOGSTASH_PACKAGE_FILE $CLOUMON_HOME/elk
+    echo "Extracting logstash binary file to $SERVER_OPTION"
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "cd $CLOUMON_HOME/elk; tar xzf $LOGSTASH_PACKAGE_FILE; rm $LOGSTASH_PACKAGE_FILE"
+  fi
+
+  if [ -z "$CLUSTER_OPTION" ]; then
+    echo "-g option was omitted. Cluster name set to default"
+    CLUSTER_OPTION="default"
+  fi
+
+  TEMPLATE_FILE_NAME=${COMPONENT_OPTION}-${PROTOCOL_OPTION}-to-es.config
+  CONFIG_FILE_NAME=${CLUSTER_OPTION}-${COMPONENT_OPTION}-${PROTOCOL_OPTION}-to-es.config
+
+  echo "Creating logstash configuration directory"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "mkdir -p $LOGSTASH_HOME/conf 2> /dev/null"
+
+
+  echo "Creating temporary directory for logstash configuration"
+  LOGSTASH_CONFIG_DIR=$INSTALL_HOME/temp-logstash-config
+  LOGSTASH_CONFIG_JMX_DIR=$LOGSTASH_CONFIG_DIR/jmxconf/${CLUSTER_OPTION}-${COMPONENT_OPTION}
+  LOGSTASH_CONFIG_TEMP_DIR=$INSTALL_HOME/temp-logstash-config/template
+  mkdir -p $LOGSTASH_CONFIG_TEMP_DIR 2> /dev/null
+  LOGSTASH_CONFIG_TEMPLATE_FILE=logstash-${COMPONENT_OPTION}-template.tar.gz
+  if [ $COMPONENT_OPTION = "hadoop-poller" ]; then
+    LOGSTASH_CONFIG_TEMPLATE_FILE=logstash-hadoop-template.tar.gz
+  fi
+
+  echo "Preparing template files"
+  cp $LOGSTASH_CONFIG_TEMPLATE_FILE $LOGSTASH_CONFIG_TEMP_DIR
+  pushd .
+  cd $LOGSTASH_CONFIG_TEMP_DIR
+  tar xzf $LOGSTASH_CONFIG_TEMPLATE_FILE
+  popd
+
+  echo "Setting logstash configurations"
+  sed -e "s/{es_hosts}/$ELASTICSEARCH_HOST_PORT/g" $LOGSTASH_CONFIG_TEMP_DIR/$TEMPLATE_FILE_NAME > $LOGSTASH_CONFIG_DIR/$CONFIG_FILE_NAME
+  
+  $SED_REPLACE_CMD "s/{cluster_name}/$CLUSTER_OPTION/g" $LOGSTASH_CONFIG_DIR/$CONFIG_FILE_NAME
+
+  if [ $COMPONENT_OPTION = "hadoop-poller" ]; then
+    count=1
+    while read -u9 config_line; do
+      NAMENODE="{namenode$count}"
+      $SED_REPLACE_CMD "s/$NAMENODE/$config_line/g" $LOGSTASH_CONFIG_DIR/$CONFIG_FILE_NAME
+      count=$((count + 1))
+    done 9<$FILENAME_OPTION
+  fi
+
+  if [ $COMPONENT_OPTION = "elasticsearch" ]; then
+    while read -u9 config_line; do
+      ES_HOST="{es_host}"
+      $SED_REPLACE_CMD "s/$ES_HOST/$config_line/g" $LOGSTASH_CONFIG_DIR/$CONFIG_FILE_NAME
+    done 9<$FILENAME_OPTION
+  fi
+
+  if [ $PROTOCOL_OPTION = "jmx" ] && [ $COMPONENT_OPTION != "hadoop-poller" ]; then
+    mkdir -p $LOGSTASH_CONFIG_JMX_DIR 2> /dev/null
+    echo "Creating directory for jmx configurations"
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "mkdir -p $LOGSTASH_HOME/jmxconf 2> /dev/null"
+
+    echo "Setting logstash configurations for jmx"
+    while read -u9 config_line; do
+      type=$(echo $config_line | cut -d ' ' -f 1)
+      server=$(echo $config_line | sed -e "s/$type//g" -e "s/^ //g" -e "s/ $//g")
+
+      if [ -z $server ]; then
+        echo "server configuration file format is wrong."
+        exit 2
+      fi
+      sed -e "s/{hostname}/$server/g" $LOGSTASH_CONFIG_TEMP_DIR/jmxconf/${COMPONENT_OPTION}/$type-template > $LOGSTASH_CONFIG_JMX_DIR/$type-$server
+
+    done 9<$FILENAME_OPTION
+
+    echo "Copying logstash configuration for jmx"
+    $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $LOGSTASH_CONFIG_JMX_DIR $LOGSTASH_HOME/jmxconf
+  fi
+
+  echo "Copying logstash configuration files"
+  $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $LOGSTASH_CONFIG_DIR/$CONFIG_FILE_NAME $LOGSTASH_HOME/conf
+
+  # deleting template directory
+  echo "Deleting temporary files"
+  rm -rf $LOGSTASH_CONFIG_DIR
+
+  echo "Success to install logstash"
+
+elif [ $COMMAND = "kibana" ]; then
+  OPTS=`getopt hs:e: "$@"`
+  RT=$?
+  if [ $RT -ne 0 ] || [ $# -eq 0 ]; then
+    echo ""
+    print_kibana_help
+    exit 1
+  fi
+
+  parse_args "print_kibana_help" $OPTS
+
+  if [[ ! $SERVER_OPTION ]] || [[ ! $ES_SERVER_OPTION ]]; then
+    require_option "$SERVER_OPTION" "server option"
+    require_option "$ES_SERVER_OPTION" "server option"
+    echo ""
+    print_kibana_help
+    exit 1
+  fi
+
+  mkdir_for_cloumon_elk
+  # deploy kibana 
+  KIBANA_HOME=$CLOUMON_HOME/elk/kibana
+  echo "Copying kibana binary file to $SERVER_OPTION"
+  $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $INSTALL_HOME/$KIBANA_PACKAGE_FILE $CLOUMON_HOME/elk
+
+  echo "Extracting kibana binary file at $CLOUMON_HOME/elk"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "cd $CLOUMON_HOME/elk; tar xzf $KIBANA_PACKAGE_FILE; rm $KIBANA_PACKAGE_FILE"
+
+  echo "Configuring kibana options"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "sed -e \"s/{hostname}/$ES_SERVER_OPTION/g\" $KIBANA_HOME/template/kibana.yml > $KIBANA_HOME/config/kibana.yml"
+
+  echo "Success to install kibana"
+
+elif [ $COMMAND = "elasticsearch" ]; then
+  OPTS=`getopt hs:m: "$@"`
+  RT=$?
+  if [ $RT -ne 0 ]; then
+    echo ""
+    elasticsearch_help
+    exit 1
+  fi
+
+  parse_args "print_elasticsearch_help" $OPTS
+
+  if [[ ! $SERVER_OPTION ]]; then
+    require_option "$SERVER_OPTION" "server option"
+    echo ""
+    print_elasticsearch_help
+    exit 1
+  fi
+
+  mkdir_for_cloumon_elk
+  # deploy elasticsearch 
+  ELASTICSEARCH_HOME=$CLOUMON_HOME/elk/elasticsearch
+
+  echo "Copying elasticsearch binary file to $SERVER_OPTION"
+  $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $INSTALL_HOME/$ELASTICSEARCH_PACKAGE_FILE $CLOUMON_HOME/elk
+
+  echo "Extracting elasticsearch binary file at $CLOUMON_HOME/elk"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "cd $CLOUMON_HOME/elk; tar xzf $ELASTICSEARCH_PACKAGE_FILE; rm $ELASTICSEARCH_PACKAGE_FILE"
+
+  echo "Configuring elasticsearch options"
+  $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "sed -e \"s/{hostname}/$ES_SERVER_OPTION/g\" $ELASTICSEARCH_HOME/template/elasticsearch.yml > $ELASTICSEARCH_HOME/config/elasticsearch.yml"
+  if [[ $MEMORY_OPTION ]]; then
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "$SED_REPLACE_CMD "" -e \"s/ES_HEAP_SIZE=/ES_HEAP_SIZE=${MEMORY_OPTION}/g\" $ELASTICSEARCH_HOME/bin/start-es.sh"
+  fi
+
+  echo "Success to install elasticsearch."
+
+elif [ $COMMAND = "sysagent" ]; then
+  OPTS=`getopt hs:e: "$@"`
+  RT=$?
+  if [ $RT -ne 0 ] || [ $# -eq 0 ]; then
+    echo ""
+    print_sysagent_help
+    exit 1
+  fi
+
+  parse_args "print_sysagent_help" $OPTS
+
+  if [[ ! $SERVER_OPTION ]] ; then
+    require_option "$SERVER_OPTION" "server option"
+    echo ""
+    print_sysagent_help
+    exit 1
+  fi
+
+  # deploy system agent
+  SYSAGENT_HOME=$CLOUMON_HOME/sysagent
+  if [ -f $SERVER_OPTION ]; then
+    for host in $(cat $SERVER_OPTION); do
+      echo "[$host] Copying sysagent binary file to $SERVER_OPTION"
+      $TOOLS_BIN copy -u $REMOTE_USER -s $host $INSTALL_HOME/$SYSAGENT_PACKAGE_FILE $CLOUMON_HOME
+
+      echo "[$host] Extracting sysagent binary at $SERVER_OPTION"
+      $TOOLS_BIN run -u $REMOTE_USER -s $host "cd $CLOUMON_HOME; rm -rf $SYSAGENT_DIRECTORY_NAME $SYSAGENT_HOME; tar xf $SYSAGENT_PACKAGE_FILE; mv $SYSAGENT_DIRECTORY_NAME $SYSAGENT_HOME"
+    done
+  else 
+    echo "Copying sysagent binary file to $SERVER_OPTION"
+    $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $INSTALL_HOME/$SYSAGENT_PACKAGE_FILE $CLOUMON_HOME
+    echo "Extracting sysagent binary at $SERVER_OPTION"
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "cd $CLOUMON_HOME; rm -rf $SYSAGENT_DIRECTORY_NAME $SYSAGENT_HOME; tar xf $SYSAGENT_PACKAGE_FILE; mv $SYSAGENT_DIRECTORY_NAME $SYSAGENT_HOME"
+  fi
+
+  echo "Success to install sysagent"
+
+elif [ $COMMAND = "alert" ]; then
+
+  OPTS=`getopt hs:e: "$@"`
+  RT=$?
+  if [ $RT -ne 0 ] || [ $# -eq 0 ]; then
+    echo ""
+    print_alert_help
+    exit 1
+  fi
+
+  parse_args "print_alert_help" $OPTS
+
+  if [[ ! $SERVER_OPTION ]] || [[ ! $ES_SERVER_OPTION ]]; then
+    require_option "$SERVER_OPTION" "server option"
+    require_option "$ES_SERVER_OPTION" "server option"
+    echo ""
+    print_alert_help
+    exit 1
+  fi
+  
+  # deploy alert home
+  ALERT_HOME=$CLOUMON_HOME/alert
+  if [ -f $SERVER_OPTION ]; then
+    for host in $(cat $SERVER_OPTION); do
+      echo "[$host] Copying alert binary file"
+      $TOOLS_BIN copy -u $REMOTE_USER -s $host $INSTALL_HOME/$ALERT_PACKAGE_FILE $CLOUMON_HOME
+
+      echo "[$host] Extracting alert binary"
+      $TOOLS_BIN run -u $REMOTE_USER -s $host "cd $CLOUMON_HOME; tar xzf $ALERT_PACKAGE_FILE; rm $ALERT_PACKAGE_FILE"
+
+      echo "[$host] Configuring config file"
+      $TOOLS_BIN run -u $REMOTE_USER -s $host "$SED_REPLACE_CMD \"\" \"s/{es_host}/$ES_SERVER_OPTION/g\" $ALERT_HOME/system-alert.config"
+    done
+  else 
+    echo "Copying alert binary file to $SERVER_OPTION"
+    $TOOLS_BIN copy -u $REMOTE_USER -s $SERVER_OPTION $INSTALL_HOME/$ALERT_PACKAGE_FILE $CLOUMON_HOME
+
+    echo "Extracting alert binary at $SERVER_OPTION"
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "cd $CLOUMON_HOME; tar xzf $ALERT_PACKAGE_FILE; rm $ALERT_PACKAGE_FILE"
+    
+    echo "Configuring config file"
+    $TOOLS_BIN run -u $REMOTE_USER -s $SERVER_OPTION "$SED_REPLACE_CMD \"\" \"s/{es_host}/$ES_SERVER_OPTION/g\" $ALERT_HOME/system-alert.config"
+  fi
+
+  echo "Success to install alert"
+
+else
+  print_help
+fi
+
+
+echo "Done"

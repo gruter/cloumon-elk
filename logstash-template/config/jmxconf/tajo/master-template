@@ -1,0 +1,11 @@
+{
+  "host": "{hostname}",
+  "port": 5961,
+  "username": "monitorRole",
+  "password": "tajotest",
+  "queries": [
+  {
+    "object_name": "Tajo:*"
+  }
+  ]
+}

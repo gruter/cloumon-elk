@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+INSTALL_HOME=$(cd `dirname "$0"`; pwd)
+. $INSTALL_HOME/env.sh
+
+
+WGET=`which wget`
+CURL=`which curl`
+
+download() {
+  local url=$1
+  if [[ '' == $WGET ]] && [[ '' == $CURL ]]; then
+    echo "No program to download ELK binary files"
+    exit 1
+  fi
+
+  if [ "$CURL" ]; then
+    $CURL -s -O $1
+  elif [ "$WGET" ]; then
+    $WGET --quiet --no-check-certificate $1
+  fi
+}
+
+untar() {
+  local file=$1
+  tar xzf $file
+}
+
+download_rename_clear() {
+  local url=$1
+  local filename=$2
+  local targetname=$3
+
+  if [ -e "$targetname" ]; then
+    echo "Remove existing directory $targetname"
+    rm -rf "$targetname"
+  fi
+  
+  echo "Download the file from $url"
+  download $url
+  echo "Untar the file"
+  download $url
+  untar $filename.tar.gz
+  echo "Rename $filename to $targetname"
+  mv $filename $targetname
+  rm $filename.tar.gz
+}
+
+
+# elasticsearch binary
+download_rename_clear $ELASTICSEARCH_DOWNLOAD_URL $ELASTICSEARCH_FULL_NAME elasticsearch
+cp $ELASTICSEARCH_TEMPLATE/bin/* elasticsearch/bin
+mkdir elasticsearch/template
+cp $ELASTICSEARCH_TEMPLATE/config/* elasticsearch/template
+
+# kibana binary
+download_rename_clear $KIBANA_DOWNLOAD_URL $KIBANA_FULL_NAME kibana
+cp $KIBANA_TEMPLATE/bin/* kibana/bin
+mkdir kibana/template
+cp $KIBANA_TEMPLATE/config/* kibana/template
+
+# logstash binary
+download_rename_clear $LOGSTASH_DOWNLOAD_URL $LOGSTASH_FULL_NAME logstash
+cp $LOGSTASH_TEMPLATE/bin/* logstash/bin
+
+# install logstash plugins
+pushd .
+cd logstash
+JRUBY_PATH=`pwd`/vendor/jruby/bin
+# install logstash-output-elasticsearch_java
+bin/plugin install logstash-output-elasticsearch_java
+# install logstash-input-jmx plugin
+bin/plugin install logstash-input-jmx
+# install logstash-input-http_poller plugin
+bin/plugin install logstash-input-http_poller
+# install patched logstash-input-ganglia plugin
+git clone https://github.com/keybod/logstash-input-ganglia.git
+cd logstash-input-ganglia
+git checkout huge-datagram
+export PATH=$JRUBY_PATH:$PATH
+gem build logstash-input-ganglia.gemspec
+cd ..
+bin/plugin install ./logstash-input-ganglia/logstash-input-ganglia-*.gem
+popd
+
+$INSTALL_HOME/make-tarball.sh

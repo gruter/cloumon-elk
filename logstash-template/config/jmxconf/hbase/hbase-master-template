@@ -1,0 +1,17 @@
+{
+  "host": "{hostname}",
+  "port": 5971,
+  "username": "monitorRole",
+  "password": "hbasetest",
+  "queries": [
+  {
+    "object_name": "Hadoop:service=HBase,name=*"
+  },
+  {
+    "object_name": "Hadoop:service=HBase,name=Master,sub=*"
+  },
+  {
+    "object_name": "Hadoop:service=HBase,name=MetricsSystem,sub=*"
+  }
+  ]
+}
