@@ -5,16 +5,15 @@ CloumonELK can be a good start point to monitor the metrics from bigdata compone
 * Support multi-cluster monitoring
 * Ready-to-use Kibana dashboards and charts
  
-# Requirements
-
-* x86_64 linux server 
-* JDK 1.8 
-* gmonitor user account and its ssh key
-
 # ELK Versions
 * Elasticsearch 2.1.1
 * Kibana 4.3.1-linux
 * Logstash 2.1.1
+
+# Requirements
+* x86_64 linux server 
+* JDK 1.8 
+* gmonitor user account and its ssh key
 
 # Getting started
 ## Download CloumonELK source codes
