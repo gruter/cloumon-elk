@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>CloumonELK by gruter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">CloumonELK</h1>
+      <h2 class="project-tagline">Cloumon ELK version</h2>
+      <a href="https://github.com/gruter/cloumon-elk" class="btn">View on GitHub</a>
+      <a href="https://github.com/gruter/cloumon-elk/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/gruter/cloumon-elk/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="about-cloumonelk" class="anchor" href="#about-cloumonelk" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>About CloumonELK</h1>
+
+<p>CloumonELK is a monitoring solution package based on the popular ELK (ElasticSearch, Logstash and Kibana) stack.  It helps you to build your own monitoring stack easily, without hassles to download and install ELK from the scratch. CloumonELK provides predefined configuration files to collect metrics from bigdata components such as Apache Tajo, Apache Hadoop, Apache HBase, Apache ZooKeeper and Apache Flume.
+CloumonELK can be a good start point to monitor the metrics from bigdata components.</p>
+
+<ul>
+<li>Support multi-cluster monitoring</li>
+<li>Ready-to-use Kibana dashboards and charts</li>
+</ul>
+
+<h1>
+<a id="elk-versions" class="anchor" href="#elk-versions" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>ELK Versions</h1>
+
+<ul>
+<li>Elasticsearch 2.1.1</li>
+<li>Kibana 4.3.1-linux</li>
+<li>Logstash 2.1.1</li>
+</ul>
+
+<h1>
+<a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Requirements</h1>
+
+<ul>
+<li>x86_64 linux server </li>
+<li>JDK 1.8 </li>
+<li>gmonitor user account and its ssh key</li>
+</ul>
+
+<h1>
+<a id="getting-started" class="anchor" href="#getting-started" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Getting started</h1>
+
+<h2>
+<a id="download-cloumonelk-source-codes" class="anchor" href="#download-cloumonelk-source-codes" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Download CloumonELK source codes</h2>
+
+<p><code>git clone https://github.com/gruter/cloumon-elk.git</code></p>
+
+<p>Run the download-modules script to get the binaries of Elasticsearch, Logstash and Kibana.</p>
+
+<p><code>./download-modules</code></p>
+
+<p>Then go to your download directory and edit the env.sh file. </p>
+
+<pre><code>$ vi env.sh
+ELASTICSEARCH_HOST_PORT=host:port
+</code></pre>
+
+<ul>
+<li>host : the hostname of your elasticsearch server. The elasticsearch server stores the metrics of Logstash. If you setup Logstash and E/S on the same host, set it "localhost".</li>
+<li>port : transport port of the elasticsearch (eg. 5921)<br>
+</li>
+</ul>
+
+<h2>
+<a id="install-elasticsearch" class="anchor" href="#install-elasticsearch" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install Elasticsearch</h2>
+
+<p>Install elasticsearch with the following command. Change hostname and heapsize according to your environment.</p>
+
+<pre><code>./install.sh elasticsearch -s hostname -m heapsize
+</code></pre>
+
+<p><code>ex) ./install.sh elasticsearch -s 192.168.0.100 -m 4g</code></p>
+
+<h2>
+<a id="install-kibana" class="anchor" href="#install-kibana" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install Kibana</h2>
+
+<p>Install Kibana. </p>
+
+<pre><code>./install.sh kibana -s hostname -e "elasticsearch_host"
+</code></pre>
+
+<p><code>ex) ./install.sh kibana -s 192.168.0.100 -e "localhost"</code></p>
+
+<h2>
+<a id="install-logstash" class="anchor" href="#install-logstash" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install Logstash</h2>
+
+<p>Install Logstash. </p>
+
+<pre><code>./install.sh logstash -c target_service -p protocol -s hostname -f config_file -g group_name [-k]
+</code></pre>
+
+<p><code>ex) ./install.sh logstash -c hadoop -p jmx -s 192.168.0.100 -f ./hadoop.config -g development</code></p>
+
+<ul>
+<li>-c target_service: the name of a service to be monitored. eg. hadoop, hbase, zookeeper, flume </li>
+<li>-p protocol: the protocol to gather metrics. eg. jmx, http, ganglia</li>
+<li>-s hostname: the host where Logstash is installed</li>
+<li>-f config_file: the path of the config file containing target hosts to be monitored in jmx protocol.</li>
+<li>-g group_name: group name of a cluster. CloumonELK can monitor multiple clusters and each cluster is called a group. </li>
+<li>-k: skip installation of Logstash binary. If you already have Logstash binary installed, you can skip the binary installation step with this option.</li>
+</ul>
+
+<h3>
+<a id="supported-components-and-protocols" class="anchor" href="#supported-components-and-protocols" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Supported Components and Protocols</h3>
+
+<p>Below is the list of components that can be monitored with CloumonELK.</p>
+
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tajo</td>
+<td>ganglia</td>
+</tr>
+<tr>
+<td>Hadoop</td>
+<td>jmx <br> ganglia</td>
+</tr>
+<tr>
+<td>Hadoop-poller</td>
+<td>jmx <br> ganglia</td>
+</tr>
+<tr>
+<td>Flume</td>
+<td>jmx <br> ganglia</td>
+</tr>
+<tr>
+<td>HBase</td>
+<td>jmx <br> ganglia</td>
+</tr>
+<tr>
+<td>ZooKeeper</td>
+<td>jmx</td>
+</tr>
+<tr>
+<td>ElasticSearch</td>
+<td>http</td>
+</tr>
+<tr>
+<td>System</td>
+<td>http</td>
+</tr>
+</tbody>
+</table>
+
+<p>1) JMX protocol</p>
+
+<p>In case you use JMX protocol to monitor certain component, you need to define the type of server in the configuration file. Below are the supported components and type of server:</p>
+
+<ul>
+<li>Hadoop
+
+<ul>
+<li>namenode</li>
+<li>datanode</li>
+<li>journalnode</li>
+</ul>
+</li>
+<li>HBase
+
+<ul>
+<li>hbase-master</li>
+<li>hbase-regionserver</li>
+</ul>
+</li>
+<li>Flume
+
+<ul>
+<li>flume</li>
+</ul>
+</li>
+<li>ZooKeeper
+
+<ul>
+<li>zookeeper</li>
+</ul>
+</li>
+<li>Tajo
+
+<ul>
+<li>master</li>
+<li>worker</li>
+</ul>
+</li>
+</ul>
+
+<p>For the services using JMX, you need to create the config file for each service. For example, hadoop.config would look like: </p>
+
+<pre><code>$ vi hadoop.config
+namenode host001
+namenode host002
+journalnode host001
+journalnode host002
+journalnode host003
+datanode host004
+datanode host005
+datanode host006
+</code></pre>
+
+<p>For other services, refer to the sample-installer.sh for more information.</p>
+
+<p>2) hadoop-poller components</p>
+
+<p>hadoop-poller is an additional compent for gathering full metrics of hadoop. hadoop-poller connects to web admin page of namenode, parses the metric information on the page and store the metrics to elasticsearch. To use hadoop-poller, create "namenodes.config" file and add host:port of hadoop namenode in it. For example, if you have a namenode and standby namenode for HA, namenodes.config is likely to be:</p>
+
+<pre><code>$ vi  namenodes.config
+host001:50070
+host002:50070
+</code></pre>
+
+<p>And then intall hadoop-poller components, like below:</p>
+
+<pre><code>./install logstash -s 192.168.0.100 -c hadoop-poller -p ganglia -f  ./namenodes.config -k -g development
+</code></pre>
+
+<h2>
+<a id="setting-up-kibana-reports" class="anchor" href="#setting-up-kibana-reports" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Setting up Kibana reports</h2>
+
+<p>When you've done with installing CloumonELK, setup the Kibana dashboards and chart templates. You can use built-in templates for the group "development" by the following command:</p>
+
+<pre><code>./kibana-data/restore.sh elasticsearch_host:port template_file group_name
+</code></pre>
+
+<p><code>ex) ./kibana-data/restore.sh 192.168.0.100:5911 hadoop-ganglia.json development</code></p>
+
+<p>The following templates are included in CloumonELK:</p>
+
+<ul>
+<li>hadoop-ganglia.json</li>
+<li>hadoop-jmx.json</li>
+<li>tajo-ganglia.json</li>
+<li>hbase-ganglia.json</li>
+<li>hbase-jmx.json</li>
+<li>flume-ganglia.json</li>
+<li>flume-jmx.json</li>
+<li>zookeeper-jmx.json</li>
+<li>system-http.json</li>
+<li>elasticsearch-http.json</li>
+</ul>
+
+<h1>
+<a id="create-your-own-installer-from-sample-installersh" class="anchor" href="#create-your-own-installer-from-sample-installersh" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Create your own installer from sample-installer.sh</h1>
+
+<p><code>sample-installer.sh</code> has a bunch of install commands so that you can install multiple components at once. Build your own installer script based on sample-installer.sh and then install CloumonELK using your installer script.</p>
+
+<h1>
+<a id="viewing-kibana-dashboards" class="anchor" href="#viewing-kibana-dashboards" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Viewing Kibana Dashboards</h1>
+
+<p>OK, now you've done with CloumonELK setup. Visit http://kibana_hostname:5931 in your web browser and see the Kibana dashboard and charts to monitor your clusters. </p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/gruter/cloumon-elk">CloumonELK</a> is maintained by <a href="https://github.com/gruter">gruter</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+            <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-73366163-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
