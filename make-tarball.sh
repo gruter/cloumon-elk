@@ -33,7 +33,7 @@ if [ $# = 1 ]; then
     ;;
   esac
 elif [ $# = 0 ]; then
-  echo "Deleting existing tablls"
+  echo "Deleting existing tarballs"
   rm $LOGSTASH_PACKAGE_FILE 2> /dev/null
   rm $KIBANA_PACKAGE_FILE 2> /dev/null
   rm $ELASTICSEARCH_PACKAGE_FILE 2> /dev/null
